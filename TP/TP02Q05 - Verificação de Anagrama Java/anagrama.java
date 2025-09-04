@@ -1,5 +1,6 @@
 public class anagrama {
     
+    // Ordena os caracteres de uma string em ordem crescente
     public static String ordenar(String str) {
         int tam = str.length();
         char[] string = new char[tam];
@@ -8,6 +9,7 @@ public class anagrama {
             string[i] = str.charAt(i);
         }
 
+        // Ordenação por seleção
         for (int i = 0; i < (tam - 1); i++) {
             int menor = i;
             for (int j = (i + 1); j < tam; j++) {
@@ -20,6 +22,7 @@ public class anagrama {
             string[menor] = temp;
         }
 
+        // Converte array de volta para string
         String resultado = "";
         for (int i = 0; i < tam; i++) {
             resultado += string[i];
@@ -28,23 +31,27 @@ public class anagrama {
         return resultado;
     }
 
+    // Verifica se duas palavras são anagramas
     public static boolean ehAnagrama(String str){
         String str1 = "";
         String str2 = "";
         int i = 0;
         int tam = str.length();
 
+        // Extrai a primeira palavra
         while(i < tam && str.charAt(i) != ' '){
             str1 += str.charAt(i);
             i++;
         }
 
-        i += 3;
+        i += 3; // Pula " - "
 
+        // Extrai a segunda palavra
         for(int j = i; j < tam; j++){
             str2 += str.charAt(j);
         }
 
+        // Compara palavras ordenadas
         String ordenado1 = ordenar(str1);
         String ordenado2 = ordenar(str2);
         return ordenado1.equals(ordenado2);
