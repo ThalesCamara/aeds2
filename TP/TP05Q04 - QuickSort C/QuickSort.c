@@ -3,13 +3,13 @@
 #include <string.h>
 #include <stdbool.h>
 #include <time.h>
-#include <ctype.h> // Adicionado para isspace (necessário para 'trim')
+#include <ctype.h> // Mantido para isspace (necessário para 'apararEspacos')
 
-#define MAX_LINE_SIZE 4096
-#define MAX_FIELD_SIZE 512
-#define MAX_ARRAY_ELEMENTS 50
+#define TAM_LINHA_MAX 4096
+#define TAM_CAMPO_MAX 512
+#define MAX_ELEM_ARRAY 50
 
-//Estrutura para armazenar os dados de um jogo
+// Estrutura renomeada de 'Game' para 'Jogo'
 typedef struct {
     int id;
     char* name;
@@ -31,406 +31,401 @@ typedef struct {
     int genresCount;
     char** tags;
     int tagsCount;
-} Game;
+} Jogo;
 
-// Variáveis globais para contagem
-int comparacoes = 0;
-int movimentacoes = 0;
+// Variáveis globais renomeadas
+int g_num_comparacoes = 0;
+int g_num_movimentacoes = 0;
 
-void parseAndLoadGame(Game* game, char* line);
-void printGame(Game* game);
-void freeGame(Game* game);
-char* getNextField(char* line, int* pos);
-char** splitString(const char* str, char delimiter, int* count);
-char* trim(char* str);
-char* formatDate(char* dateStr);
-void printStringArray(char** arr, int count);
-void quicksort(Game* games, int esq, int dir);
-int partition(Game* games, int esq, int dir);
-void swap(Game* a, Game* b);
-int compareGames(Game* a, Game* b);
-void criarLog(const char* matricula, int comp, int mov, double tempo);
-void parseDate(const char* dateStr, int* day, int* month, int* year);
+// Protótipos de funções renomeadas
+void processarLinhaCSV(Jogo* jogo, char* linha);
+void exibirJogo(Jogo* jogo);
+void liberarJogo(Jogo* jogo);
+char* lerCampoCSV(char* linha, int* pos);
+char** dividirString(const char* str, char delimitador, int* contagem);
+char* apararEspacos(char* str);
+char* formatarDataEntrada(char* strData);
+void imprimirArrayStrings(char** arr, int contagem);
+void ordenarRapido(Jogo* jogos, int esquerda, int direita);
+int particionar(Jogo* jogos, int esquerda, int direita);
+void trocar(Jogo* a, Jogo* b);
+int compararJogos(Jogo* a, Jogo* b);
+void escreverLog(const char* matricula, int comp, int mov, double tempo);
+void extrairData(const char* strData, int* dia, int* mes, int* ano);
 
-//Lógica Principal
+// Lógica Principal
 int main() {
-    char lineBuffer[MAX_LINE_SIZE];
-    const char* filePath = "/tmp/games.csv";
+    char buffer[TAM_LINHA_MAX];
+    const char* caminho_arquivo = "/tmp/games.csv";
     
-    FILE* file = fopen(filePath, "r");
-    if (file == NULL) {
+    FILE* arq = fopen(caminho_arquivo, "r");
+    if (arq == NULL) {
         perror("Erro ao abrir o arquivo");
         return 1;
     }
     
-    int gameCount = 0;
-    fgets(lineBuffer, MAX_LINE_SIZE, file); 
-    while (fgets(lineBuffer, MAX_LINE_SIZE, file) != NULL) {
-        gameCount++;
+    int totalJogos = 0;
+    fgets(buffer, TAM_LINHA_MAX, arq); // Pula cabeçalho
+    while (fgets(buffer, TAM_LINHA_MAX, arq) != NULL) {
+        totalJogos++;
     }
-    fclose(file);
+    fclose(arq);
 
-    Game* allGames = (Game*) malloc(sizeof(Game) * gameCount);
-    if (allGames == NULL) {
+    Jogo* listaCompleta = (Jogo*) malloc(sizeof(Jogo) * totalJogos);
+    if (listaCompleta == NULL) {
         printf("Erro de alocação de memória\n");
         return 1;
     }
     
-    file = fopen(filePath, "r");
-    if (file == NULL) {
+    arq = fopen(caminho_arquivo, "r");
+    if (arq == NULL) {
         perror("Erro ao reabrir o arquivo");
-        free(allGames);
+        free(listaCompleta);
         return 1;
     }
 
-    fgets(lineBuffer, MAX_LINE_SIZE, file); 
+    fgets(buffer, TAM_LINHA_MAX, arq); // Pula cabeçalho
     int i = 0;
-    while (fgets(lineBuffer, MAX_LINE_SIZE, file) != NULL) {
-        parseAndLoadGame(&allGames[i], lineBuffer);
+    while (fgets(buffer, TAM_LINHA_MAX, arq) != NULL) {
+        processarLinhaCSV(&listaCompleta[i], buffer);
         i++;
     }
-    fclose(file);
+    fclose(arq);
 
-    char inputId[MAX_FIELD_SIZE];
-    Game* gamesParaOrdenar = (Game*) malloc(sizeof(Game) * gameCount);
-    int countParaOrdenar = 0;
+    char id_entrada[TAM_CAMPO_MAX];
+    Jogo* listaFiltrada = (Jogo*) malloc(sizeof(Jogo) * totalJogos);
+    int numFiltrados = 0;
     
-    while (fgets(inputId, MAX_FIELD_SIZE, stdin) != NULL) {
-        inputId[strcspn(inputId, "\n")] = 0;
-        if (strcmp(inputId, "FIM") == 0) {
+    while (fgets(id_entrada, TAM_CAMPO_MAX, stdin) != NULL) {
+        id_entrada[strcspn(id_entrada, "\n")] = 0;
+        if (strcmp(id_entrada, "FIM") == 0) {
             break;
         }
 
-        int targetId = atoi(inputId);
-        for (i = 0; i < gameCount; i++) {
-            if (allGames[i].id == targetId) {
-
-                gamesParaOrdenar[countParaOrdenar] = allGames[i];
-                countParaOrdenar++;
+        int idAlvo = atoi(id_entrada);
+        for (i = 0; i < totalJogos; i++) {
+            if (listaCompleta[i].id == idAlvo) {
+                listaFiltrada[numFiltrados] = listaCompleta[i];
+                numFiltrados++;
                 break;
             }
         }
     }
 
-    clock_t inicio = clock();
-    quicksort(gamesParaOrdenar, 0, countParaOrdenar - 1);
-    clock_t fim = clock();
-    double tempo = ((double)(fim - inicio)) / CLOCKS_PER_SEC;
+    clock_t tempo_inicio = clock();
+    ordenarRapido(listaFiltrada, 0, numFiltrados - 1);
+    clock_t tempo_fim = clock();
+    double tempo_exec = ((double)(tempo_fim - tempo_inicio)) / CLOCKS_PER_SEC;
 
-    for (i = 0; i < countParaOrdenar; i++) {
-        printGame(&gamesParaOrdenar[i]);
+    for (i = 0; i < numFiltrados; i++) {
+        exibirJogo(&listaFiltrada[i]);
     }
 
-    // =======================================================
-    // ALTERAÇÃO FEITA AQUI: Matrícula definida como "885470"
-    // =======================================================
-    criarLog("885470", comparacoes, movimentacoes, tempo);
+    escreverLog("885470", g_num_comparacoes, g_num_movimentacoes, tempo_exec);
 
-    free(gamesParaOrdenar);
+    free(listaFiltrada);
     
-    for (i = 0; i < gameCount; i++) {
-        freeGame(&allGames[i]);
+    for (i = 0; i < totalJogos; i++) {
+        liberarJogo(&listaCompleta[i]);
     }
-    free(allGames);
+    free(listaCompleta);
 
     return 0;
 }
 
-void parseDate(const char* dateStr, int* day, int* month, int* year) {
-    sscanf(dateStr, "%d/%d/%d", day, month, year);
+// Renomeada de 'parseDate' para 'extrairData'
+void extrairData(const char* strData, int* dia, int* mes, int* ano) {
+    sscanf(strData, "%d/%d/%d", dia, mes, ano);
 }
 
-// Função de comparação entre dois jogos
-int compareGames(Game* a, Game* b) {
-    comparacoes++;
+// Função de comparação entre dois jogos (renomeada)
+int compararJogos(Jogo* j1, Jogo* j2) {
+    g_num_comparacoes++;
     
-    int dayA, monthA, yearA;
-    int dayB, monthB, yearB;
+    int dia1, mes1, ano1;
+    int dia2, mes2, ano2;
     
-    parseDate(a->releaseDate, &dayA, &monthA, &yearA);
-    parseDate(b->releaseDate, &dayB, &monthB, &yearB);
+    extrairData(j1->releaseDate, &dia1, &mes1, &ano1);
+    extrairData(j2->releaseDate, &dia2, &mes2, &ano2);
 
-    if (yearA != yearB) {
-        return yearA - yearB;
+    if (ano1 != ano2) {
+        return ano1 - ano2;
     }
-
-    if (monthA != monthB) {
-        return monthA - monthB;
+    if (mes1 != mes2) {
+        return mes1 - mes2;
     }
-    
-    if (dayA != dayB) {
-        return dayA - dayB;
+    if (dia1 != dia2) {
+        return dia1 - dia2;
     }
     
-    // Em caso de empate na data completa, compara pelo ID
-    if (a->id < b->id) return -1;
-    if (a->id > b->id) return 1;
+    // Critério de desempate: ID
+    if (j1->id != j2->id) {
+        return (j1->id < j2->id) ? -1 : 1;
+    }
     return 0;
 }
 
-// Função para trocar dois jogos
-void swap(Game* a, Game* b) {
-    Game temp = *a;
+// Função para trocar dois jogos (renomeada)
+void trocar(Jogo* a, Jogo* b) {
+    Jogo temp = *a;
     *a = *b;
     *b = temp;
-    movimentacoes += 3; // Cada swap conta como 3 movimentações
+    g_num_movimentacoes += 3; // Usa variável global renomeada
 }
 
-// Função de partição do Quicksort
-int partition(Game* games, int esq, int dir) {
-    Game pivo = games[dir];
-    int i = esq - 1;
+// Função de partição do Quicksort (renomeada)
+int particionar(Jogo* jogos, int esquerda, int direita) {
+    Jogo pivo = jogos[direita];
+    int idx_menor = esquerda - 1;
     
-    for (int j = esq; j < dir; j++) {
-        if (compareGames(&games[j], &pivo) <= 0) {
-            i++;
-            swap(&games[i], &games[j]);
+    for (int idx_atual = esquerda; idx_atual < direita; idx_atual++) {
+        if (compararJogos(&jogos[idx_atual], &pivo) <= 0) {
+            idx_menor++;
+            trocar(&jogos[idx_menor], &jogos[idx_atual]);
         }
     }
     
-    swap(&games[i + 1], &games[dir]);
-    return i + 1;
+    trocar(&jogos[idx_menor + 1], &jogos[direita]);
+    return idx_menor + 1;
 }
 
-// Implementação do Quicksort
-void quicksort(Game* games, int esq, int dir) {
-    if (esq < dir) {
-        int indicePivo = partition(games, esq, dir);
-        quicksort(games, esq, indicePivo - 1);
-        quicksort(games, indicePivo + 1, dir);
+// Implementação do Quicksort (renomeada)
+void ordenarRapido(Jogo* jogos, int esquerda, int direita) {
+    if (esquerda < direita) {
+        int pivo_idx = particionar(jogos, esquerda, direita);
+        ordenarRapido(jogos, esquerda, pivo_idx - 1);
+        ordenarRapido(jogos, pivo_idx + 1, direita);
     }
 }
 
-// Função para criar arquivo de log
-// =================================================================
-// ALTERAÇÃO FEITA AQUI: O nome do arquivo agora usa a matrícula
-// =================================================================
-void criarLog(const char* matricula, int comp, int mov, double tempo) {
-    char filename[100];
-    // Cria o nome do arquivo dinamicamente (ex: "885470_quicksort.txt")
-    sprintf(filename, "%s_quicksort.txt", matricula);
+// Função para criar arquivo de log (renomeada)
+void escreverLog(const char* matricula, int comp, int mov, double tempo) {
+    char nomeArquivo[100];
+    sprintf(nomeArquivo, "%s_quicksort.txt", matricula);
     
-    FILE* logFile = fopen(filename, "w"); // Usa o nome do arquivo dinâmico
-    if (logFile != NULL) {
-        // Escreve a matrícula e as métricas dentro do arquivo
-        fprintf(logFile, "%s\t%d\t%d\t%f\n", matricula, comp, mov, tempo);
-        fclose(logFile);
+    FILE* logArq = fopen(nomeArquivo, "w");
+    if (logArq != NULL) {
+        fprintf(logArq, "%s\t%d\t%d\t%f\n", matricula, comp, mov, tempo);
+        fclose(logArq);
     }
 }
 
 
-// Função que preenche uma struct Game a partir de uma linha do CSV
-void parseAndLoadGame(Game* game, char* line) {
+// Função que preenche uma struct Jogo a partir de uma linha do CSV (renomeada)
+void processarLinhaCSV(Jogo* jogo, char* linha) {
     int pos = 0;
 
-    game->id = atoi(getNextField(line, &pos));
-    game->name = getNextField(line, &pos);
-    game->releaseDate = formatDate(getNextField(line, &pos));
-    game->estimatedOwners = atoi(getNextField(line, &pos));
+    jogo->id = atoi(lerCampoCSV(linha, &pos));
+    jogo->name = lerCampoCSV(linha, &pos);
+    jogo->releaseDate = formatarDataEntrada(lerCampoCSV(linha, &pos));
+    jogo->estimatedOwners = atoi(lerCampoCSV(linha, &pos));
     
-    char* priceStr = getNextField(line, &pos);
-    game->price = (strcmp(priceStr, "Free to Play") == 0 || strlen(priceStr) == 0) ? 0.0f : atof(priceStr);
-    free(priceStr);
+    char* precoStr = lerCampoCSV(linha, &pos);
+    jogo->price = (strcmp(precoStr, "Free to Play") == 0 || strlen(precoStr) == 0) ? 0.0f : atof(precoStr);
+    free(precoStr);
 
-    char* langStr = getNextField(line, &pos);
-    langStr[strcspn(langStr, "]")] = 0; 
-    memmove(langStr, langStr + 1, strlen(langStr)); 
-    for(int i = 0; langStr[i]; i++) if(langStr[i] == '\'') langStr[i] = ' ';
-    game->supportedLanguages = splitString(langStr, ',', &game->supportedLanguagesCount);
-    free(langStr);
+    char* idiomasStr = lerCampoCSV(linha, &pos);
+    idiomasStr[strcspn(idiomasStr, "]")] = 0; 
+    memmove(idiomasStr, idiomasStr + 1, strlen(idiomasStr)); 
+    for(int i = 0; idiomasStr[i]; i++) if(idiomasStr[i] == '\'') idiomasStr[i] = ' ';
+    jogo->supportedLanguages = dividirString(idiomasStr, ',', &jogo->supportedLanguagesCount);
+    free(idiomasStr);
     
-    game->metacriticScore = atoi(getNextField(line, &pos));
-    game->userScore = atof(getNextField(line, &pos));
-    game->achievements = atoi(getNextField(line, &pos));
+    jogo->metacriticScore = atoi(lerCampoCSV(linha, &pos));
+    jogo->userScore = atof(lerCampoCSV(linha, &pos));
+    jogo->achievements = atoi(lerCampoCSV(linha, &pos));
 
-    game->publishers = splitString(getNextField(line, &pos), ',', &game->publishersCount);
-    game->developers = splitString(getNextField(line, &pos), ',', &game->developersCount);
-    game->categories = splitString(getNextField(line, &pos), ',', &game->categoriesCount);
-    game->genres = splitString(getNextField(line, &pos), ',', &game->genresCount);
-    game->tags = splitString(getNextField(line, &pos), ',', &game->tagsCount);
+    jogo->publishers = dividirString(lerCampoCSV(linha, &pos), ',', &jogo->publishersCount);
+    jogo->developers = dividirString(lerCampoCSV(linha, &pos), ',', &jogo->developersCount);
+    jogo->categories = dividirString(lerCampoCSV(linha, &pos), ',', &jogo->categoriesCount);
+    jogo->genres = dividirString(lerCampoCSV(linha, &pos), ',', &jogo->genresCount);
+    jogo->tags = dividirString(lerCampoCSV(linha, &pos), ',', &jogo->tagsCount);
 }
 
-// Imprime uma struct Game no formato exigido
-void printGame(Game* game) {
-    char formattedDate[12];
-    strcpy(formattedDate, game->releaseDate);
-    if(formattedDate[1] == '/') {
-        memmove(formattedDate + 1, formattedDate, strlen(formattedDate) + 1);
-        formattedDate[0] = '0';
+// Imprime uma struct Jogo no formato exigido (renomeada)
+void exibirJogo(Jogo* jogo) {
+    char dataFormatada[12];
+    strcpy(dataFormatada, jogo->releaseDate);
+    if(dataFormatada[1] == '/') { // Adiciona 0 à esquerda se necessário
+        memmove(dataFormatada + 1, dataFormatada, strlen(dataFormatada) + 1);
+        dataFormatada[0] = '0';
     }
 
-    char priceStr[16];
-    if (game->price == 0.0f) {
-        strcpy(priceStr, "0.0"); 
+    char precoStr[16];
+    if (jogo->price == 0.0f) {
+        strcpy(precoStr, "0.0"); // Mantém lógica original
     } else {
-        sprintf(priceStr, "%.2f", game->price);
+        sprintf(precoStr, "%.2f", jogo->price);
         
-        char *dot = strchr(priceStr, '.');
-        if (dot != NULL) {
-            char *end = priceStr + strlen(priceStr) - 1;
-            
-            while (end > dot && *end == '0') {
-                *end = '\0';
-                end--;
+        char *ponto = strchr(precoStr, '.');
+        if (ponto != NULL) {
+            char *fim = precoStr + strlen(precoStr) - 1;
+            while (fim > ponto && *fim == '0') {
+                *fim = '\0';
+                fim--;
             }
-            
-            if (end == dot) {
-                *dot = '\0';
+            if (fim == ponto) {
+                *ponto = '\0';
             }
         }
     }
 
-    // Formata userScore para mostrar 0.0 quando for 0
-    char userScoreStr[16];
-    if (game->userScore == 0.0f) {
-        strcpy(userScoreStr, "0.0");
+    char scoreStr[16];
+    if (jogo->userScore == 0.0f) {
+        strcpy(scoreStr, "0.0"); // Mantém lógica original
     } else {
-        sprintf(userScoreStr, "%.1f", game->userScore);
+        sprintf(scoreStr, "%.1f", jogo->userScore);
     }
 
     printf("=> %d ## %s ## %s ## %d ## %s ## ", 
-        game->id, game->name, formattedDate, game->estimatedOwners, priceStr);
-    printStringArray(game->supportedLanguages, game->supportedLanguagesCount);
+        jogo->id, jogo->name, dataFormatada, jogo->estimatedOwners, precoStr);
+    imprimirArrayStrings(jogo->supportedLanguages, jogo->supportedLanguagesCount);
     printf(" ## %d ## %s ## %d ## ", 
-        game->metacriticScore == 0 ? -1 : game->metacriticScore, 
-        userScoreStr, 
-        game->achievements);
-    printStringArray(game->publishers, game->publishersCount);
+        jogo->metacriticScore == 0 ? -1 : jogo->metacriticScore, 
+        scoreStr, 
+        jogo->achievements);
+    imprimirArrayStrings(jogo->publishers, jogo->publishersCount);
     printf(" ## ");
-    printStringArray(game->developers, game->developersCount);
+    imprimirArrayStrings(jogo->developers, jogo->developersCount);
     printf(" ## ");
-    printStringArray(game->categories, game->categoriesCount);
+    imprimirArrayStrings(jogo->categories, jogo->categoriesCount);
     printf(" ## ");
-    printStringArray(game->genres, game->genresCount);
+    imprimirArrayStrings(jogo->genres, jogo->genresCount);
     printf(" ## ");
-    printStringArray(game->tags, game->tagsCount);
+    imprimirArrayStrings(jogo->tags, jogo->tagsCount);
     printf(" ##\n");
 }
 
-// Libera a memória de uma única struct Game
-void freeGame(Game* game) {
-    free(game->name);
-    free(game->releaseDate);
-    for (int i = 0; i < game->supportedLanguagesCount; i++) free(game->supportedLanguages[i]);
-    free(game->supportedLanguages);
-    for (int i = 0; i < game->publishersCount; i++) free(game->publishers[i]);
-    free(game->publishers);
-    for (int i = 0; i < game->developersCount; i++) free(game->developers[i]);
-    free(game->developers);
-    for (int i = 0; i < game->categoriesCount; i++) free(game->categories[i]);
-    free(game->categories);
-    for (int i = 0; i < game->genresCount; i++) free(game->genres[i]);
-    free(game->genres);
-    for (int i = 0; i < game->tagsCount; i++) free(game->tags[i]);
-    free(game->tags);
+// Libera a memória de uma única struct Jogo (renomeada)
+void liberarJogo(Jogo* jogo) {
+    free(jogo->name);
+    free(jogo->releaseDate);
+    for (int i = 0; i < jogo->supportedLanguagesCount; i++) free(jogo->supportedLanguages[i]);
+    free(jogo->supportedLanguages);
+    for (int i = 0; i < jogo->publishersCount; i++) free(jogo->publishers[i]);
+    free(jogo->publishers);
+    for (int i = 0; i < jogo->developersCount; i++) free(jogo->developers[i]);
+    free(jogo->developers);
+    for (int i = 0; i < jogo->categoriesCount; i++) free(jogo->categories[i]);
+    free(jogo->categories);
+    for (int i = 0; i < jogo->genresCount; i++) free(jogo->genres[i]);
+    free(jogo->genres);
+    for (int i = 0; i < jogo->tagsCount; i++) free(jogo->tags[i]);
+    free(jogo->tags);
 }
 
-// Pega o próximo campo do CSV, tratando aspas
-char* getNextField(char* line, int* pos) {
-    char* field = (char*) malloc(sizeof(char) * MAX_FIELD_SIZE);
+// Pega o próximo campo do CSV, tratando aspas (renomeada)
+char* lerCampoCSV(char* linha, int* pos) {
+    char* campo = (char*) malloc(sizeof(char) * TAM_CAMPO_MAX);
     int i = 0;
-    bool inQuotes = false;
+    bool entreAspas = false;
     
-    if (line[*pos] == '"') {
-        inQuotes = true;
+    if (linha[*pos] == '"') {
+        entreAspas = true;
         (*pos)++;
     }
     
-    while (line[*pos] != '\0') {
-        if (inQuotes) {
-            if (line[*pos] == '"') {
+    while (linha[*pos] != '\0') {
+        if (entreAspas) {
+            if (linha[*pos] == '"') {
                 (*pos)++;
                 break;
             }
         } else {
-            if (line[*pos] == ',') {
+            if (linha[*pos] == ',') {
                 break;
             }
         }
-        field[i++] = line[(*pos)++];
+        campo[i++] = linha[(*pos)++];
     }
     
-    if (line[*pos] == ',') {
+    if (linha[*pos] == ',') {
         (*pos)++;
     }
     
-    field[i] = '\0';
-    return field;
+    campo[i] = '\0';
+    return campo;
 }
 
-// Divide uma string em um array de strings
-char** splitString(const char* str, char delimiter, int* count) {
-    int initialCount = 0;
-    for(int i = 0; str[i]; i++) if(str[i] == delimiter) initialCount++;
-    *count = initialCount + 1;
+// Divide uma string em um array de strings (renomeada)
+char** dividirString(const char* str, char delimitador, int* contagem) {
+    int contagemInicial = 0;
+    for(int i = 0; str[i]; i++) if(str[i] == delimitador) contagemInicial++;
+    *contagem = contagemInicial + 1;
 
-    char** result = (char**) malloc(sizeof(char*) * (*count));
-    char buffer[MAX_FIELD_SIZE];
+    char** resultado = (char**) malloc(sizeof(char*) * (*contagem));
+    char buffer[TAM_CAMPO_MAX];
     int str_idx = 0;
-    int result_idx = 0;
+    int resultado_idx = 0;
 
     for (int i = 0; i <= strlen(str); i++) {
-        if (str[i] == delimiter || str[i] == '\0') {
+        if (str[i] == delimitador || str[i] == '\0') {
             buffer[str_idx] = '\0';
-            result[result_idx] = (char*) malloc(sizeof(char) * (strlen(buffer) + 1));
-            strcpy(result[result_idx], trim(buffer));
-            result_idx++;
+            resultado[resultado_idx] = (char*) malloc(sizeof(char) * (strlen(buffer) + 1));
+            strcpy(resultado[resultado_idx], apararEspacos(buffer));
+            resultado_idx++;
             str_idx = 0;
         } else {
             buffer[str_idx++] = str[i];
         }
     }
-    return result;
+    return resultado;
 }
 
-// Remove espaços das bordas
-char* trim(char* str) {
-    char *end;
+// Remove espaços das bordas (renomeada)
+char* apararEspacos(char* str) {
+    char *fim;
     while(isspace((unsigned char)*str)) str++;
     if(*str == 0) return str;
-    end = str + strlen(str) - 1;
-    while(end > str && isspace((unsigned char)*end)) end--;
-    end[1] = '\0';
+    fim = str + strlen(str) - 1;
+    while(fim > str && isspace((unsigned char)*fim)) fim--;
+    fim[1] = '\0';
     return str;
 }
 
-// Formata a data para dd/MM/yyyy
-char* formatDate(char* dateStr) {
-    char* formattedDate = (char*) malloc(sizeof(char) * 12);
-    char monthStr[4] = {0};
-    char day[3] = "01";
-    char year[5] = "0000";
+// Formata a data para dd/MM/yyyy (renomeada e lógica interna alterada)
+char* formatarDataEntrada(char* strData) {
+    char* dataFormatada = (char*) malloc(sizeof(char) * 12);
+    char strMes[4] = {0};
+    char dia[3] = "01";
+    char ano[5] = "0000";
 
-    sscanf(dateStr, "%s", monthStr);
+    sscanf(strData, "%s", strMes);
 
-    char* monthNum = "01";
-    if (strcmp(monthStr, "Feb") == 0) monthNum = "02";
-    else if (strcmp(monthStr, "Mar") == 0) monthNum = "03";
-    else if (strcmp(monthStr, "Apr") == 0) monthNum = "04";
-    else if (strcmp(monthStr, "May") == 0) monthNum = "05";
-    else if (strcmp(monthStr, "Jun") == 0) monthNum = "06";
-    else if (strcmp(monthStr, "Jul") == 0) monthNum = "07";
-    else if (strcmp(monthStr, "Aug") == 0) monthNum = "08";
-    else if (strcmp(monthStr, "Sep") == 0) monthNum = "09";
-    else if (strcmp(monthStr, "Oct") == 0) monthNum = "10";
-    else if (strcmp(monthStr, "Nov") == 0) monthNum = "11";
-    else if (strcmp(monthStr, "Dec") == 0) monthNum = "12";
+    // Lógica alterada para usar arrays, mas com o mesmo resultado
+    const char* mesesAbrev[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+    const char* mesesNum[] = {"01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"};
+    char* numMes = "01"; // Padrão "Jan"
 
-    char* ptr = dateStr;
+    for (int k = 0; k < 12; k++) {
+        if (strcmp(strMes, mesesAbrev[k]) == 0) {
+            numMes = (char*)mesesNum[k];
+            break;
+        }
+    }
+
+    char* ptr = strData;
     while(*ptr && !isdigit(*ptr)) ptr++;
-    if(isdigit(*ptr)) sscanf(ptr, "%[^,], %s", day, year);
+    if(isdigit(*ptr)) {
+        // Tenta ler "dd, yyyy"
+        if (sscanf(ptr, "%[^,], %s", dia, ano) != 2) {
+            // Se falhar, lê "yyyy" (formato "MMM yyyy")
+            sscanf(ptr, "%s", ano);
+            strcpy(dia, "01"); // Dia padrão
+        }
+    }
     
-    sprintf(formattedDate, "%s/%s/%s", day, monthNum, year);
-    free(dateStr);
-    return formattedDate;
+    sprintf(dataFormatada, "%s/%s/%s", dia, numMes, ano);
+    free(strData);
+    return dataFormatada;
 }
 
-// Imprime um array de strings
-void printStringArray(char** arr, int count) {
+// Imprime um array de strings (renomeada)
+void imprimirArrayStrings(char** arr, int contagem) {
     printf("[");
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < contagem; i++) {
         printf("%s", arr[i]);
-        if (i < count - 1) {
+        if (i < contagem - 1) {
             printf(", ");
         }
     }
