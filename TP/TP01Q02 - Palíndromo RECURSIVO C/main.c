@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#define MAX 10000
 
 // Função recursiva para verificar se é palíndromo
 bool descobrirPalindromo(char str[], int TAM, int i) {
@@ -15,7 +16,7 @@ bool descobrirPalindromo(char str[], int TAM, int i) {
 }
 
 int main() {
-    char str[10000];
+    char str[MAX];
     while (fgets(str, sizeof(str), stdin) != NULL) {
         int TAM = strlen(str);
         int i = 0;
